@@ -1,6 +1,6 @@
 from connector import GmailConnector
 
 if __name__ == "__main__":
+    print(1e6)
     connector = GmailConnector()
-    service = connector.get_service()
-    connector.start_reading_message_periodcaly(service)
+    connector.start_reading_messages()
