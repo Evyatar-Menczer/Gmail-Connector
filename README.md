@@ -10,8 +10,8 @@ https://developers.google.com/gmail/api/v1/reference
 
 ```conda env list```
 
-choose your environment
+Choose your environment
 ```conda activate my_env```
 
-install requirements
+Install requirements
 ```pip install -r requirements.txt```
