@@ -37,26 +37,6 @@ class GmailConnector:
         if config_file:
             self.init_with_config_file(config_file)
 
-    def init_with_config_file(self, file: str) -> None:
-        """Initializes the connector values - creds,path,interval(from the file)
-         in case config file is given.
-
-      Args:
-        file: file's name.
-
-      Returns:
-        None.
-      """
-        with open(file) as config_file:
-            data = json.load(config_file)
-        for key, val in data.items():
-            if key.lower() == "credentials":
-                self.creds = val
-            elif key == "path":
-                self.path = val
-            elif key == "interval":
-                self.interval = val
-
     def save_messages(self, messages: list) -> None:
         """Save all messages as .json file in format SENDER,RECIEVER,SUBJECT,BODY.
 
@@ -82,12 +62,10 @@ class GmailConnector:
                 complete_file_name = os.path.join(self.path, file_name)
                 with open(complete_file_name, "w") as f:
                     json.dump(msg, f)
-            except (errors.HttpError, AttributeError) as e:
+            except (errors.HttpError, AttributeError, KeyError) as e:
                 logger.exception(
                     "Error occured at {}\n".format(
-                        inspect.currentframe().f_code.co_name
-                    ),
-                    e,
+                        inspect.currentframe().f_code.co_name), e
                 )
 
     def mark_as_read(self, messages: list) -> None:
@@ -107,7 +85,7 @@ class GmailConnector:
                     body={"removeLabelIds": ["UNREAD"]},
                 ).execute()
 
-        except errors.HttpError as e:
+        except (errors.HttpError, KeyError) as e:
             logger.exception(
                 "Error occured at {}\n".format(inspect.currentframe().f_code.co_name), e
             )
@@ -141,7 +119,7 @@ class GmailConnector:
                     )
                 )
                 return messages
-        except (Exception, errors.HttpError) as e:
+        except (KeyError, errors.HttpError) as e:
             logger.exception(
                 "Error occured at {}\n".format(inspect.currentframe().f_code.co_name), e
             )
@@ -163,19 +141,24 @@ class GmailConnector:
         )
 
     def parse_message(self, headers: dict) -> dict:
-        """Gets all messages requierd data - sender,reciever,uuid,date,subject,body.
+        """Gets all message requierd data as specified in self.headers.
 
           Args:
             headers: dictionary contains all message headers.
 
           Returns:
-            A dictionary with all requierd data of message, specified in self.headers
+            A dictionary with all requierd data.
            """
         new_msg = {}
-        for header in headers:
-            name = header["name"]
-            if name in self.required_headers:
-                new_msg[name] = header["value"]
+        try:
+            for header in headers:
+                name = header["name"]
+                if name in self.required_headers:
+                    new_msg[name] = header["value"]
+        except KeyError as e:
+            logger.exception(
+                "Error occured at {}\n".format(inspect.currentframe().f_code.co_name), e
+            )
         return new_msg
 
     def get_messages_details(self, messages: list) -> dict:
@@ -201,7 +184,7 @@ class GmailConnector:
                 # Message's body not in Headers.
                 new_msg["Body"] = msg["snippet"]
                 all_new_msgs.append(new_msg)
-        except (errors.HttpError, AttributeError) as e:
+        except (errors.HttpError, AttributeError, KeyError) as e:
             logger.exception(
                 "Error occured at {}\n".format(inspect.currentframe().f_code.co_name), e
             )
@@ -282,24 +265,28 @@ class GmailConnector:
         # The file token.pickle stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first
         # time.
-        if os.path.exists(self.TOKEN_PICKLE):
-            with open(self.TOKEN_PICKLE, "rb") as token:
-                self.creds = pickle.load(token)
-        # If there are no (valid) credentials available, let the user log in.
-        if not self.creds or not self.creds.valid:
-            if self.creds and self.creds.expired and self.creds.refresh_token:
-                self.creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    "credentials.json", self.SCOPES
-                )
-                self.creds = flow.run_local_server(port=0)
-            # Save the credentials for the next run
-            with open(self.TOKEN_PICKLE, "wb") as token:
-                pickle.dump(self.creds, token)
+        try:
+            if os.path.exists(self.TOKEN_PICKLE):
+                with open(self.TOKEN_PICKLE, "rb") as token:
+                    self.creds = pickle.load(token)
+            # If there are no (valid) credentials available, let the user log in.
+            if not self.creds or not self.creds.valid:
+                if self.creds and self.creds.expired and self.creds.refresh_token:
+                    self.creds.refresh(Request())
+                else:
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        "credentials.json", self.SCOPES
+                    )
+                    self.creds = flow.run_local_server(port=0)
+                # Save the credentials for the next run
+                with open(self.TOKEN_PICKLE, "wb") as token:
+                    pickle.dump(self.creds, token)
 
-        service = build("gmail", "v1", credentials=self.creds)
-
+            service = build("gmail", "v1", credentials=self.creds)
+        except (errors.HttpError, FileNotFoundError, AttributeError) as e:
+            logger.exception(
+                "Error occured at {}\n".format(inspect.currentframe().f_code.co_name), e
+            )
         return service
 
     def __fulldate_to_time(self, date: str) -> str:
@@ -349,6 +336,31 @@ class GmailConnector:
             return None
         return fixed_uuid
 
+    def __init_with_config_file(self, file: str) -> None:
+        """Initializes the connector values - creds,path,interval(from the file)
+         in case config file is given.
+
+      Args:
+        file: file's name.
+
+      Returns:
+        None.
+      """
+        try:
+            with open(file) as config_file:
+                data = json.load(config_file)
+            for key, val in data.items():
+                if key.lower() == "credentials":
+                    self.creds = val
+                elif key == "path":
+                    self.path = val
+                elif key == "interval":
+                    self.interval = val
+        except (FileNotFoundError,AttributeError) as e:
+            logger.exception(
+                "Error occured at {}\n".format(
+                    inspect.currentframe().f_code.co_name), e
+            )
 
 class DateUuidException(Exception):
     """Class for any exception occurs while dealing with
