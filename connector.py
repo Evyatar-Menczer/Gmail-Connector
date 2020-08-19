@@ -35,7 +35,7 @@ class GmailConnector:
         self.connector = None
         self.required_headers = ["To", "From", "Subject", "UUID", "Date", "Message-ID"]
         if config_file:
-            self.init_with_config_file(config_file)
+            self.__init_with_config_file(config_file)
 
     def save_messages(self, messages: list) -> None:
         """Save all messages as .json file in format SENDER,RECIEVER,SUBJECT,BODY.
@@ -49,7 +49,7 @@ class GmailConnector:
         for msg in messages:
             try:
                 date = self.__fulldate_to_time(msg["Date"])
-                uuid = self.__extract_uuid(msg["UUID"])
+                uuid = self.__extract_uuid(msg["Message-ID"])
                 if uuid is None or date is None:
                     raise DateUuidException
                 file_name = "{} {}.json".format(date, uuid)
@@ -275,7 +275,7 @@ class GmailConnector:
                     self.creds.refresh(Request())
                 else:
                     flow = InstalledAppFlow.from_client_secrets_file(
-                        "credentials.json", self.SCOPES
+                        "client_secret.json", self.SCOPES
                     )
                     self.creds = flow.run_local_server(port=0)
                 # Save the credentials for the next run
@@ -356,7 +356,9 @@ class GmailConnector:
                     self.path = val
                 elif key == "interval":
                     self.interval = val
-        except (FileNotFoundError,AttributeError) as e:
+
+            self.USER_ID = self.creds["email"]
+        except (FileNotFoundError,AttributeError,KeyError) as e:
             logger.exception(
                 "Error occured at {}\n".format(
                     inspect.currentframe().f_code.co_name), e
