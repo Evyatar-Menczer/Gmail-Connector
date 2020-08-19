@@ -33,7 +33,7 @@ class GmailConnector:
         self.interval = 10
         self.is_running = False
         self.connector = None
-        self.required_headers = ["To", "From", "Subject", "UUID", "Date", "Message-ID"]
+        self.required_headers = ["To", "From", "Subject", "Body", "Date", "Message-ID"]
         if config_file:
             self.__init_with_config_file(config_file)
 
