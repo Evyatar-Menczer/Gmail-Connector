@@ -56,7 +56,7 @@ class GmailConnector:
 
                 # Pops the date and uuid values that are not longer necessary for the json file.
                 msg.pop("Date", None)
-                msg.pop("UUID", None)
+                msg.pop("Message-ID", None)
 
                 # Determining the path for files.
                 complete_file_name = os.path.join(self.path, file_name)
